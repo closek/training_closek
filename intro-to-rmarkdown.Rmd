@@ -1,0 +1,69 @@
+---
+title: "Introduction to RMarkdown"
+author: "Collin J. Closek"
+date: "2023-04-03"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+bibliography: references.bib
+reference-section-title: References
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Markdown syntax
+
+## This is a header
+
+-   This is **bold**
+-   This is *italic*
+-   superscript^2^
+-   subscript~2~
+
+### This is my RMarkdown test using using syntax
+
+[link to RMarkdown Syntax Guide] (<https://www.rstudio.com/wp-content/uploads/2015/03/rmarkdown-reference.pdf>) 
+
+To hyperlink the link remove the space [link to RMarkdown Syntax Guide](https://www.rstudio.com/wp-content/uploads/2015/03/rmarkdown-reference.pdf)
+
+***This is SO cool*** ![](path/to/smallorb.png)
+
+###Adding citations
+
+This is an important fact [@oke2020a]
+
+###Adding tables
+
+This is an example
+
+| Col1 | Col2 | Col3 |
+|------|------|------|
+|   A   |    Zeus  |      |
+|   B   |      |      |
+|   C   |      |      |
+
+: this is the table caption
+
+
+
+
+```{r example}
+heights_ft <- c(5.2, 6.0, 5.7)
+
+import_coef <- 3.14
+
+```
+
+##Exercise: new chunk
+
+```{r}
+havingfun <- 457
+havingfun*2
+```
+
+
+
+##References

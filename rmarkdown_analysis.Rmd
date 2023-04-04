@@ -1,0 +1,82 @@
+---
+title: "RMarkdown Analysis"
+author: "Collin J. Closek"
+date: "2023-04-03"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+This contains North Pole Environmental Observatory Bottle Chemistry data which includes measurements of seawater chemistry along with supporting conductivity, temperature, and depth (CTD) data. Measurements were taken from sea ice platforms each April or May from 2000-2014. More information about the project is available at the [project web site link](http://psc.apl.washington.edu/northpole).
+
+This [data set](https://arcticdata.io/catalog/view/doi:10.18739/A25T3FZ8X) was downloaded on April 3, 2023.
+
+### Read data
+
+#### Set up
+```{r library}
+library(readr)
+```
+
+```{r read data, warning=FALSE, message=FALSE}
+bg_chem <- read_csv("data/BGchem2008data.csv")
+```
+
+#### Data exploration
+```{r data expl, eval=FALSE, echo=FALSE}
+#eval is whether to run (or not) and echo is whether to print the code in the RMrkdwn
+
+## column names
+colnames(bg_chem)
+
+## structure of my data
+str(bg_chem)
+
+## summary stats
+summary(bg_chem)
+
+## Open data in new tab
+View(bg_chem)
+
+## unique values in a column
+unique(bg_chem$Date)
+```
+
+
+## Analysis
+
+### Calculate summary statistics
+```{r}
+nitrate <- mean(bg_chem$NO3)
+nitrite <- mean(bg_chem$NO2)
+amm <- mean(bg_chem$NH4)
+phos <- mean(bg_chem$P)
+```
+
+
+### Calculate mean Redfield ratio
+Redfield ratio is the total nitrogen over phosphorous in a sample (16:1)
+```{r ratio calc}
+
+ratio <- (amm + nitrate + nitrite)/phos
+
+```
+
+
+### Plot Redfield ratio
+```{r plot}
+plot(bg_chem$P, bg_chem$NO3 + bg_chem$NO2 + bg_chem$NH4)
+```
+
+
+## Conclusion
+
+The Redfield ration is `r round(ratio)`
