@@ -176,3 +176,23 @@ head(sse_catch)
 
 ```
 
+
+## All together
+```{r}
+catch_original <- read_csv(url("https://knb.ecoinformatics.org/knb/d1/mn/v2/object/df35b.302.1", method = "libcurl"))
+
+
+mean_region_all <- catch_original %>%
+  select(-All, -notesRegCode) %>% 
+  mutate(Chinook = ifelse(Chinook == "I", 1, Chinook)) %>% 
+  mutate(Chinook = as.numeric(Chinook)) %>% 
+  pivot_longer(-c(Region, Year), 
+               names_to = "species", 
+               values_to = "catch") %>%
+  mutate(catch = catch*1000) %>% 
+  group_by(Region) %>% 
+  summarize(mean_catch = mean(catch))
+
+head(mean_region)
+```
+
