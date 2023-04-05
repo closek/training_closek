@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Lessons
 - [Intro to Rmd](intro-to-rmarkdown.html)
-- Cleaning and Wrangling Data
+- [Cleaning and Wrangling Data](data_cleaning.html)
 - Data Viz
 - Spatial Data
 
