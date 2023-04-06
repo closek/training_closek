@@ -1,0 +1,256 @@
+---
+title: "Intro to sf package for spatial data and making maps"
+author: "Collin J. Closek"
+date: "2023-04-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries 
+```{r libraries}
+library(readr)
+library(sf)
+library(ggplot2)
+library(leaflet)
+library(scales)
+library(ggmap) #used for base maps to static maps
+library(dplyr)
+```
+
+## Read in data 
+Shape files from [kb](https://dev.nceas.ucsb.edu/view/urn:uuid:6f07cb25-a4a1-48e8-95cb-74f532f3ce2d)
+```{r}
+ak_regions <- sf::read_sf("data/ak_regions_simp.shp")
+#you can press tab after read_sf to navigate available files in the data folder
+```
+
+## Explore data
+```{r}
+plot(ak_regions)
+```
+run "class(ak_regions)" in the console
+
+```{r}
+head(ak_regions)
+```
+```{r}
+glimpse(ak_regions)
+```
+
+**Unprojected vs. projected**
+Every sf object needs a coordinate reference system (or crs) defined in order to work with it correctly.
+
+Some crs are unprojected or geographic coordinate system (gcs) are 3D.
+
+2D space is represented as projected.
+
+Both unprojected and projected use lat/lon, however the unprojected lat/lon are where the space is on the globe vs. the projected are rendered for 2D flat images.
+
+
+```{r}
+st_crs(ak_regions)
+```
+Shows that there's Geo CRS data (i.e., 3D), which isn't good for 2D flat maps
+
+### Transform the geo crs to projected crs using the [EPSG](https://spatialreference.org/ref/epsg/?page=1) code 3338
+```{r}
+ak_regions_3338 <- ak_regions %>% 
+  st_transform(crs = 3338)
+
+st_crs(ak_regions_3338)
+```
+
+```{r map projected}
+plot(ak_regions_3338)
+```
+
+## `sf` & the tidyverse
+```{r}
+colnames(ak_regions_3338)
+```
+
+```{r}
+ak_regions_3338 %>%
+    select(region)
+```
+the geometery column is what makes it a sf object - it's "sticky" because the file is an sf file and using the sf package, so it stays with any column we select.
+
+```{r}
+unique(ak_regions_3338$region)
+```
+
+```{r}
+ak_regions_3338 %>%
+    filter(region == "Yukon")
+```
+
+You can learn more about the tidyverse methods for sf objects using `?sf::tidyverse`
+
+## Spatial joins
+
+## Read in pop data
+```{r}
+pop <- read_csv("data/alaska_population.csv")
+```
+`View(pop)` and `class(pop)` help us to understand more about the data an that it's not an sf object, only a data.frame
+
+```{r}
+pop_4326 <- st_as_sf(pop,
+                     coords = c("lng", "lat"),
+                     crs = 4326,
+                     remove = FALSE)
+```
+You must always keep the coords in the order of longitude, then latitude.
+
+`st_as_sf` allows you to convert the data into an sf object
+
+```{r join the populations within the regions}
+pop_joined <- st_join(pop_4326, ak_regions_3338, join = st_within)
+```
+`?st_join` will allow you to see the many join options within the `st_join` pkg.
+
+Need to rerun because the crs are not matching, so you need to use 4326: WGS84 (World Geodetic System 1984) as a default point of reference and then to 3338: Alaska Albers (projected CRS).
+
+```{r}
+pop_3338 <- st_transform(pop_4326, crs = 3338)
+
+st_crs(pop_3338)
+```
+
+```{r}
+pop_joined <- st_join(pop_3338, ak_regions_3338, join = st_within)
+```
+
+Transform to a data.frame to do `group_by()` and `summarize()`
+```{r transform to a data frame}
+pop_region <- pop_joined %>% 
+  as.data.frame() %>% 
+  group_by(region) %>% 
+  summarize(total_pop = sum(population))
+
+head(pop_region)
+```
+
+```{r add pop_region to the spatial data}
+
+pop_region_3338 <- left_join(ak_regions_3338, pop_region, by = "region")
+```
+`View(pop_region_3338)` allows you to see that the two objects (pop_region & ak_regions_3338) are now combined
+
+```{r}
+plot(pop_region_3338["total_pop"])
+```
+
+```{r}
+pop_mgmt_3338 <- pop_region_3338 %>% 
+  group_by(mgmt_area) %>% 
+  summarize(total_pop = sum(total_pop), do_union = FALSE)
+
+head(pop_mgmt_3338)
+```
+`do_unioin` adds on the region boundaries (i.e., geometries)
+
+
+```{r}
+plot(pop_mgmt_3338["total_pop"])
+```
+
+Export to a shape file
+```{r}
+write_sf(pop_region_3338, "data/ak_regions_population.shp")
+```
+
+
+## Visualize with ggplot
+
+```{r}
+#add scalebar using `ggsn` package
+ggplot(pop_region_3338) +
+  geom_sf(aes(fill = total_pop)) +
+  labs(fill = "Total Populaiton") +
+  scale_fill_continuous(labels = comma,
+                        low = "khaki",
+                        high = "firebrick") +
+  theme_light()
+```
+Correct for colorblind
+```{r}
+ggplot(pop_region_3338) +
+  geom_sf(aes(fill = total_pop)) +
+  labs(fill = "Total Populaiton") +
+  scale_fill_viridis_c(labels = comma) +
+  theme_light()
+```
+
+You could log transform the population
+```{r}
+ggplot(pop_region_3338) +
+  geom_sf(aes(fill = log10(total_pop))) +
+  labs(fill = "Total Populaiton (log10)") +
+  scale_fill_viridis_c(labels = comma) +
+  theme_light()
+```
+
+## Rivers spatial data
+```{r}
+rivers <- read_sf("data/ak_rivers_simp.shp")
+
+st_crs(rivers)
+
+#it's projected in alaska Albers, so let's change the `rivers` object name to `rivers_3338` to stay consistant with the above objects that are projected
+
+rivers_3338 <- rivers
+
+rm(rivers)
+```
+
+
+```{r}
+ggplot() +
+  geom_sf(pop_region_3338, mapping=aes(fill = log10 (total_pop))) +
+  geom_sf(pop_3338, mapping=aes(), color = "red3", size = 0.5) +
+  geom_sf(rivers_3338, mapping=aes(linewidth = StrOrder)) +
+  scale_linewidth(range = c(0.05, 0.5), guide = "none") +
+  scale_fill_viridis_c(labels = comma) +
+  labs(fill = "Total Population", title = "Map of Alaska Populations")+
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+#you are having to add "mapping=aes()" because there is nothing in ggplot() above. geom_sf is run twice because we are layering different data ontop of one another
+```
+
+
+## Leaflet interactive map
+
+Used infrom from "Proj4" in the spatial reference [EPSG:3338 page](https://spatialreference.org/ref/epsg/3338/)
+```{r}
+epsg3338 <- leaflet::leafletCRS(
+    crsClass = "L.Proj.CRS",
+    code = "EPSG:3338",
+    proj4def =  "+proj=aea +lat_1=55 +lat_2=65 +lat_0=50 +lon_0=-154 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs",
+    resolutions = 2 ^ (16:7)
+)
+```
+
+Leaflet requires the projected (above) as well as the unprojected transformed from crs = 4326
+```{r}
+pop_region_4326 <- pop_region_3338 %>% st_transform(crs = 4326)
+```
+
+```{r}
+m <- leaflet(options = leafletOptions(crs = epsg3338)) %>% 
+  addPolygons(data = pop_region_4326,
+              fillColor = "lightgreen",
+              weight = 2,
+              fillOpacity = 2) #%>% 
+  #addTiles()
+
+m
+
+```
+
+
+
