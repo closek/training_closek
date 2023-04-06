@@ -1,0 +1,206 @@
+---
+title: 'R Practice: Spatial Data and Making Maps'
+author: "Collin J. Closek"
+date: "2023-04-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries
+```{r libraries}
+library(readr)
+library(dplyr)
+library(sf)
+library(ggplot2)
+library(scales)
+library(leaflet)
+library(ggmap)
+```
+
+## Bring in data
+```{r}
+pika <- read_csv("data/pika_fecal_glut.aw.data.csv")
+elevation <- read_csv("data/pika_fecal_glut_habitat.aw.data.csv")
+
+#alternatively, we could have brought in the linked data via:
+#pika <- read_csv("https://portal.edirepository.org/nis/dataviewer?packageid=knb-lter-nwt.268.1&entityid=43270add3532c7f3716404576cfb3f2c")
+#elevation <- read_csv("https://portal.edirepository.org/nis/dataviewer?packageid=knb-lter-nwt.268.1&entityid=6a10b35988119d0462837f9bfa31dd2f")
+
+```
+
+## Explore data
+```{r explore}
+head(pika)
+glimpse(pika)
+unique(pika$Site)
+names(pika)
+
+
+head(elevation)
+glimpse(elevation)
+unique(elevation$Station)
+
+```
+
+## Subset pika data
+```{r}
+pika_clean <- select(pika, c("Date", "Station", "UTM_Easting",        "UTM_Northing", "Concentration_pg_g", "Site", "Sex"))
+head(pika_clean)
+```
+
+```{r}
+glimpse(pika_clean)
+```
+
+## Rechlass Station, Site, Sex as `factor`, rather than `character`
+```{r clean pika}
+pika_clean <- pika_clean %>% 
+  mutate(
+    Station = as.factor(Station),
+    Site = as.factor(Site),
+    Sex = as.factor(Sex)
+    )
+
+glimpse(pika_clean)
+```
+## Recode Site locations with full name
+```{r}
+unique(pika_clean$Site)
+
+pika_clean <- pika_clean %>% 
+  mutate(
+    Site = recode(
+      Site,
+      "CG" = "Cable Gate", 
+      "WK" = "West Knoll", 
+      "LL" = "Long Lake"
+      ))
+
+glimpse(pika_clean)
+```
+
+#Move `Station` & `Site` columns next to one another
+```{r}
+pika_clean %>% 
+  relocate(Site, .after = Station)
+```
+
+## Reorder the columns
+```{r}
+pika_clean %>% 
+  relocate(Site, .before = Station) %>% 
+  relocate(Sex, .after = UTM_Northing)
+```
+## Subset `elevation` 
+```{r}
+elevation_clean <- elevation %>% 
+  select("Station", "Elev_M")
+
+glimpse(elevation_clean)
+```
+
+## Change `Station` from category `character` to `factor`
+```{r}
+elevation_clean <- elevation_clean %>% 
+  mutate(
+    Station = as.factor(Station)
+  )
+
+glimpse(elevation_clean)
+```
+
+# Join the two objects together via the column `Station` 
+```{r}
+pika_joined <- pika_clean %>% 
+  full_join(y = elevation_clean,
+            by = "Station")
+
+#alternatively: 
+#  pikas <- full_join(x = pika_clean,
+#                   y = elevation_clean,
+#                   by = "Station")
+```
+
+## Create Pikas Map
+```{r}
+class(pika_joined)
+
+pikas_sf <- st_as_sf(x= pika_joined,
+                     coords = c("UTM_Easting", "UTM_Northing"))
+
+```
+coords must be in the order of lon and then lat
+
+## Set the CRS for the geometry column 
+use the EPSG code 26913
+```{r}
+#st_crs(pikas_sf)
+
+pikas_sf <- st_set_crs(pikas_sf, 26913)
+
+ggplot(data = pikas_sf) +
+    geom_sf()
+```
+
+## Plotting points
+```{r}
+ggplot(data = pikas_sf) +
+    geom_sf(aes(color = Site, shape = Site), alpha = 0.6) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 30))
+```
+
+
+```{r}
+ggplot(data = pikas_sf) +
+    geom_sf(aes(color = Site, shape = Site), alpha = 0.6) +
+    theme_minimal() +
+    labs(
+        title = "Location of Pika Sampling Stations",
+        subtitle = "Niwot Ridge LTER",
+        x = "Latitude (Degrees)",
+        y = "Longitude (Degrees)"
+    ) +
+    theme(axis.text.x = element_text(angle = 30))
+```
+
+## Add a basemap using `ggmap`
+```{r}
+pikas_sf_4326 <- st_transform(pikas_sf, 4326)
+nwt_bbox <- c(left = -105.65, bottom = 40.04, right = -105.55, top = 40.1)
+```
+
+```{r}
+nwt_basemap <- ggmap::get_stamenmap(nwt_bbox, zoom = 13, 
+                                    maptype = "terrain")
+
+ggmap(nwt_basemap)
+```
+
+```{r}
+ggmap(nwt_basemap) +
+    geom_sf(pikas_sf_4326, 
+            mapping = aes(color = Site, shape = Site), 
+            inherit.aes = FALSE)
+```
+
+```{r}
+ggmap(nwt_basemap) +
+    geom_sf(pikas_sf_4326,
+            mapping = aes(color = Site, shape = Site),
+            inherit.aes = FALSE) +
+    theme_minimal() +
+    labs(
+        title = "Location of Pika Sampling Stations",
+        subtitle = "Niwot Ridge LTER",
+        x = "Longitude (Degrees)",
+        y = "Latitude (Degrees)"
+    ) +
+    scale_color_manual(values = c("black", "red", "purple")) 
+```
+
+
+
